@@ -1,0 +1,100 @@
+<launch>
+    <!-- PARAMETERS -->
+    <arg name="stretch_description" default="$(find stretch_manipulation)/urdf/stretch.urdf"
+        doc="Path to the clean URDF of the robot" />
+    <arg name="map_yaml" doc="filepath to previously captured map (required)" />
+    <arg name="debug_directory" default="$(env HELLO_FLEET_PATH)/debug/"
+        doc="directory where debug imagery is saved" />
+
+    <!-- STRETCH DRIVER -->
+    <param name="/stretch_driver/broadcast_odom_tf" type="bool" value="true" />
+    <param name="/stretch_driver/fail_out_of_range_goal" type="bool" value="false" />
+    <param name="/stretch_driver/mode" type="string" value="navigation" />
+    <include file="$(find stretch_core)/launch/stretch_driver.launch" pass_all_args="true" />
+    <!-- -->
+
+    <!-- VOLUME CHANGER -->
+    <node name="volume" pkg="volume" type="volume" output="screen" />
+    <!-- -->
+
+    <!-- CENTERED BASE LINK -->
+    <node name="centered_base_link_tf_publisher" pkg="tf" type="static_transform_publisher"
+        args="-0.1 0 0 0 0 0 1 /base_link /centered_base_link 100" />
+    <!-- -->
+
+    <!-- LASER RANGE FINDER -->
+    <include file="$(find stretch_core)/launch/rplidar.launch" />
+    <!-- -->
+
+    <!-- REALSENSE D435i -->
+    <include file="$(find stretch_core)/launch/d435i_high_resolution.launch"></include>
+    <node name="d435i_configure" pkg="stretch_core" type="d435i_configure" output="screen">
+        <param name="initial_mode" type="string" value="High Accuracy" />
+    </node>
+    <!-- -->
+
+    <!-- FRUSTUM FIELD OF VIEW VISUALIZATION -->
+    <node name="d435i_frustum_visualizer" pkg="stretch_core" type="d435i_frustum_visualizer"
+        output="screen" />
+    <!-- -->
+
+    <!-- OCTOMAP -->
+    <node pkg="octomap_server" type="octomap_server_node" name="octomap_server">
+        <param name="resolution" value="0.05" />
+
+        <!-- fixed map frame (set to 'map' if SLAM or localization running!) -->
+        <param name="frame_id" type="string" value="odom" />
+
+        <!-- maximum range to integrate (speedup!) -->
+        <param name="sensor_model/max_range" value="5.0" />
+
+        <!-- data source to integrate (PointCloud2) -->
+        <remap from="cloud_in" to="/camera/depth/color/points" />
+
+    </node>
+    <!-- -->
+
+    <!-- MAP SERVER -->
+    <node name="map_server" pkg="map_server" type="map_server" args="$(arg map_yaml)" />
+    <!-- -->
+
+    <!-- LOCALIZATION -->
+    <include file="$(find amcl)/examples/amcl_diff.launch" />
+    <!-- -->
+
+    <!-- NAVIGATION -->
+    <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen">
+        <rosparam file="$(find stretch_navigation)/config/common_costmap_params.yaml" command="load"
+            ns="global_costmap" />
+        <rosparam file="$(find stretch_navigation)/config/common_costmap_params.yaml" command="load"
+            ns="local_costmap" />
+        <rosparam file="$(find stretch_navigation)/config/local_costmap_params.yaml" command="load" />
+        <rosparam file="$(find stretch_navigation)/config/global_costmap_params_withmap.yaml"
+            command="load" />
+        <rosparam file="$(find stretch_navigation)/config/base_local_planner_params.yaml"
+            command="load" />
+
+        <remap from="/cmd_vel" to="/stretch/cmd_vel" />
+    </node>
+    <!-- -->
+
+    <!-- OBJECT DETECTION INSIDE THE ROBOT -->
+    <node name="object_detector" pkg="stretch_deep_perception" type="detect_objects.py"
+        output="screen">
+        <param name="debug_directory" type="string" value="$(arg debug_directory)" />
+    </node>
+    <!--  -->
+
+    <!-- PICKER SERVICE -->
+    <!-- <node name="picker_service" pkg="stretch_manipulation" type="mover_picker_service.py"
+        output="screen">
+    </node> -->
+    <!-- -->
+
+    <!-- MANIPULATOR -->
+    <!-- <node name="stretch_manipulation" pkg="stretch_manipulation" type="demo.py"
+    output="screen">
+        <param name="stretch_description" type="string" value="$(arg stretch_description)" />
+    </node> -->
+    <!-- -->
+</launch>

@@ -1,0 +1,4 @@
+string object_class
+---
+bool success
+geometry_msgs/PoseStamped pose

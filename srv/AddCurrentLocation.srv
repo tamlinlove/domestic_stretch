@@ -1,0 +1,4 @@
+string location_name
+---
+geometry_msgs/PoseWithCovarianceStamped pose
+bool success

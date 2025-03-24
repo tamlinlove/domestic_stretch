@@ -1,0 +1,4 @@
+string sentence
+string language
+---
+bool success
